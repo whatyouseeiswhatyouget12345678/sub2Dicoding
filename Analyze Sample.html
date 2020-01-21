@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<!-- saved from url=(0044)https://indrasub2dicoding.azurewebsites.net/ -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<title>2nd Submission - Dicoding</title>
+	<script src="./Analyze Sample_files/jquery.min.js.download"></script>
+</head>
+<style>
+.content {
+  max-width: 500px;
+  margin: auto;
+  text-align: center;
+}
+.button{
+  background-color: #008CBA;
+  border: 2px solid #006687;
+  color: white;
+  padding: 8px 16px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 15px;
+  margin: 2px 1px;
+  -webkit-transition-duration: 0.4s; /* Safari */
+  transition-duration: 0.4s;
+  cursor: pointer;
+  box-shadow: 0 2px 4px 0 rgba(0,0,0,0.2), 0 3px 5px 0 rgba(0,0,0,0.19);
+}
+.button:hover {
+  background-color: white; 
+  color: black; 
+  border: 2px solid #008CBA;
+}
+</style>
+<body data-gr-c-s-loaded="true" style="zoom: 1;">
+<div class="content">
+<br><br>
+	<h1 style="color:#008CBA;">Azure Magical Caption</h1>
+	
+	<div id="imageDiv">
+		<p>Image to be Analyzed:</p><p id="sourceImg"></p>
+		<img id="sourceImage" width="250" src="">
+	</div>
+	<button id="select-button" class="button">Pick and Upload Image</button>
+	<input type="file" id="file-input" style="display: none;" accept="image/x-png,image/jpg,image/jpeg">
+	<br><br><br><br>
+	<div id="jsonOutput">
+		Generated Caption :
+		<br><br>
+		<textarea id="responseTextArea" class="UIInput" style="width:450px; height:20px;"></textarea>
+	</div>
+
+</div>
+
+<script src="./Analyze Sample_files/azure-storage-blob.js.download" charset="utf-8"></script>
+
+<script>
+	const selectButton = document.getElementById("select-button");
+	const fileInput = document.getElementById("file-input");
+
+	const accountName = "dikodastorage";
+	const sasString = "se=2020-12-12&sp=rwdlac&sv=2018-03-28&ss=b&srt=sco&sig=ORDtlaXm%2Bni4600wKgM3kXLGmIHmShCEKE5E7Z5k7S4%3D";
+	const containerName = "testcontainer";
+	const containerURL = new azblob.ContainerURL(
+		`https://${accountName}.blob.core.windows.net/${containerName}?${sasString}`,
+		azblob.StorageURL.newPipeline(new azblob.AnonymousCredential));
+
+	var fileName = "";	
+
+	function makeName(length) {
+		var result           = '';
+		var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+		var charactersLength = characters.length;
+		for ( var i = 0; i < length; i++ ) {
+			result += characters.charAt(Math.floor(Math.random() * charactersLength));
+		}
+		return result;
+	}
+
+
+	function processImage(fileName) {
+		var urlImage = `https://dikodastorage.blob.core.windows.net/testcontainer/${fileName}`;
+
+		var subscriptionKey = "c19e41e1281c431aa63b35517bf7369c"; 
+
+		var uriBase =
+		"https://dikodavision.cognitiveservices.azure.com/vision/v2.0/analyze"; 
+
+		var params = {
+			"visualFeatures": "Categories,Description,Color",            
+			"language": "en",
+		}; 
+
+		var sourceImageUrl = urlImage;
+		document.querySelector("#sourceImage").src = sourceImageUrl; 
+		$("#sourceImg").html(sourceImageUrl);
+
+		$.ajax({
+			url: uriBase + "?" + $.param(params),
+
+			beforeSend: function(xhrObj){
+				xhrObj.setRequestHeader("Content-Type","application/json");
+				xhrObj.setRequestHeader(
+					"Ocp-Apim-Subscription-Key", subscriptionKey);
+			},
+
+			type: "POST",
+
+			data: '{"url": ' + '"' + sourceImageUrl + '"}',
+		})
+
+		.done(function(data) {
+            // Show formatted JSON on webpage.            
+            var myCaption = JSON.parse(JSON.stringify(data, null, 2));            
+            $("#responseTextArea").val(myCaption.description.captions[0].text);
+        })
+
+		.fail(function(jqXHR, textStatus, errorThrown) {
+            // Display error message.
+            var errorString = (errorThrown === "") ? "Error. " :
+            errorThrown + " (" + jqXHR.status + "): ";
+            errorString += (jqXHR.responseText === "") ? "" :
+            jQuery.parseJSON(jqXHR.responseText).message;
+            alert(errorString);
+        });
+	};
+
+//Upload Blobs
+const uploadFiles = async () => {
+	try {		
+		const promises = [];
+		for (const file of fileInput.files) {
+			const origName = file.name;			
+			fileName = makeName(10);
+			const indexDot = origName.lastIndexOf('.');
+			fileName = fileName + origName.substring(indexDot);
+			
+			const blockBlobURL = azblob.BlockBlobURL.fromContainerURL(containerURL, fileName);
+			promises.push(azblob.uploadBrowserDataToBlockBlob(
+				azblob.Aborter.none, file, blockBlobURL));
+		}
+		await Promise.all(promises);				
+		processImage(fileName);
+	} catch (error) {
+		console.log(error);
+	}
+}
+
+selectButton.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", uploadFiles);
+
+</script>
+
+
+</body></html>
